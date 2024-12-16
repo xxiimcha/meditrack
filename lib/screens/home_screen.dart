@@ -1,9 +1,54 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import '../widgets/custom_bottom_navbar.dart';
 import '../widgets/pill_card.dart';
 import '../widgets/vitamin_card.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
+  @override
+  _HomeScreenState createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  String prediction = "Fetching...";
+
+  // Function to get predictions from Flask API
+  Future<void> getPrediction() async {
+    final url = Uri.parse('http://192.168.254.158:5000/predict'); // Replace with your Flask server IP
+    final headers = {'Content-Type': 'application/json'};
+    final body = jsonEncode({
+      'Age': 67, // Example input
+      'Gender': 1, // Adjust based on your encoding
+      'Condition': 3,
+      'Medication': 2,
+    });
+
+    try {
+      final response = await http.post(url, headers: headers, body: body);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          prediction = data['adherence_prediction'];
+        });
+      } else {
+        setState(() {
+          prediction = "Error: ${response.statusCode}";
+        });
+      }
+    } catch (e) {
+      setState(() {
+        prediction = "Error: $e";
+      });
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    getPrediction(); // Fetch prediction on screen load
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -40,7 +85,7 @@ class HomeScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Encouragement Section
+              // Prediction Section
               Container(
                 decoration: BoxDecoration(
                   color: Colors.green.shade700,
@@ -54,16 +99,16 @@ class HomeScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          "Keep it up!",
+                          "Prediction Result:",
                           style: TextStyle(
                               color: Colors.white,
                               fontSize: 18,
                               fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 8),
-                        const Text(
-                          "You haven’t missed a single medication.",
-                          style: TextStyle(color: Colors.white),
+                        Text(
+                          prediction,
+                          style: const TextStyle(color: Colors.white, fontSize: 16),
                         ),
                       ],
                     ),

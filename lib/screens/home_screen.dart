@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../widgets/custom_bottom_navbar.dart';
-import '../widgets/pill_card.dart';
-import '../widgets/vitamin_card.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -11,42 +9,39 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String prediction = "Fetching...";
+  List<dynamic> predictions = []; // Store medication predictions
 
-  // Function to get predictions from Flask API
-  Future<void> getPrediction() async {
-    final url = Uri.parse('http://192.168.254.158:5000/predict'); // Replace with your Flask server IP
+  // Function to get predictions for all medications
+  Future<void> getPredictions() async {
+    final url = Uri.parse('http://192.168.254.158:5000/predict_all'); // Flask server IP
     final headers = {'Content-Type': 'application/json'};
-    final body = jsonEncode({
-      'Age': 67, // Example input
-      'Gender': 1, // Adjust based on your encoding
-      'Condition': 3,
-      'Medication': 2,
-    });
+
+    // Example list of medications to send to the server
+    final body = jsonEncode([
+      {'Age': 67, 'Gender': 1, 'Condition': 3, 'Medication': 2, 'Medication_Name': "Paracetamol"},
+      {'Age': 60, 'Gender': 0, 'Condition': 2, 'Medication': 1, 'Medication_Name': "Aspirin"},
+      {'Age': 45, 'Gender': 1, 'Condition': 1, 'Medication': 3, 'Medication_Name': "Metformin"},
+    ]);
 
     try {
       final response = await http.post(url, headers: headers, body: body);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() {
-          prediction = data['adherence_prediction'];
+          predictions = data; // Store the predictions
         });
       } else {
-        setState(() {
-          prediction = "Error: ${response.statusCode}";
-        });
+        print('Error: ${response.statusCode}');
       }
     } catch (e) {
-      setState(() {
-        prediction = "Error: $e";
-      });
+      print('Error: $e');
     }
   }
 
   @override
   void initState() {
     super.initState();
-    getPrediction(); // Fetch prediction on screen load
+    getPredictions(); // Fetch predictions on screen load
   }
 
   @override
@@ -79,90 +74,45 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Prediction Section
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.green.shade700,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          "Prediction Result:",
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          prediction,
-                          style: const TextStyle(color: Colors.white, fontSize: 16),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Pills for Today Section
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: predictions.isEmpty
+          ? Center(child: CircularProgressIndicator()) // Loading indicator
+          : Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Header Section
                   const Text(
-                    "Pills for today",
+                    "Medication Predictions",
                     style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black),
+                        fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
                   ),
-                  TextButton(
-                    onPressed: () {},
-                    child: const Text("See all"),
+                  const SizedBox(height: 10),
+
+                  // Dynamic List of Predictions
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: predictions.length,
+                      itemBuilder: (context, index) {
+                        final medication = predictions[index];
+                        return Card(
+                          elevation: 3,
+                          margin: const EdgeInsets.only(bottom: 16.0),
+                          child: ListTile(
+                            title: Text(
+                              medication['Medication_Name'],
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            subtitle: Text("Adherence: ${medication['Adherence']}"),
+                            leading: Icon(Icons.medical_services, color: Colors.green),
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-              PillCard(
-                title: "Paracetamol",
-                dosage: "20mg",
-                time: "10:00 AM",
-                takes: "3 left",
-              ),
-              const SizedBox(height: 20),
-
-              // Additional Vitamins Section
-              const Text(
-                "Additional Vitamins",
-                style: TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
-              ),
-              const SizedBox(height: 10),
-              VitaminCard(
-                title: "Omega 3",
-                time: "9:30 PM | After eating",
-              ),
-              const SizedBox(height: 10),
-              VitaminCard(
-                title: "Multivitamins",
-                time: "11:00 AM | Before eating",
-              ),
-            ],
-          ),
-        ),
-      ),
+            ),
       bottomNavigationBar: CustomBottomNavBar(),
     );
   }

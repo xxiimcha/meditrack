@@ -88,6 +88,27 @@ class SignInScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+                const SizedBox(height: 32),
+                const Text(
+                  "Don't have an account yet?",
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.black87,
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/signup');
+                  },
+                  child: const Text(
+                    'Sign Up',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Color(0xFF2F5D50),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
               ],
             ),
           ),

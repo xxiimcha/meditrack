@@ -9,14 +9,43 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  List<dynamic> predictions = []; // Store medication predictions
+  List<dynamic> predictions = [];
+  bool isLoading = true;
+  bool hasPatients = false; // 🔸 Simulated patient check
 
-  // Function to get predictions for all medications
+  Future<void> checkPatientsAndLoad() async {
+    // 🔸 Simulated check (replace with Firestore/your DB logic)
+    setState(() => isLoading = true);
+
+    await Future.delayed(const Duration(milliseconds: 500)); // Simulate async
+    if (!hasPatients) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text('No Patient Found'),
+          content: const Text('You have no registered patients yet. Please fill out the form.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/patient_form'); // 🔸 Route to form
+              },
+              child: const Text('Proceed to Form'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      await getPredictions();
+    }
+
+    setState(() => isLoading = false);
+  }
+
   Future<void> getPredictions() async {
-    final url = Uri.parse('http://192.168.254.158:5000/predict_all'); // Flask server IP
+    final url = Uri.parse('http://192.168.254.158:5000/predict_all');
     final headers = {'Content-Type': 'application/json'};
-
-    // Example list of medications to send to the server
     final body = jsonEncode([
       {'Age': 67, 'Gender': 1, 'Condition': 3, 'Medication': 2, 'Medication_Name': "Paracetamol"},
       {'Age': 60, 'Gender': 0, 'Condition': 2, 'Medication': 1, 'Medication_Name': "Aspirin"},
@@ -28,7 +57,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() {
-          predictions = data; // Store the predictions
+          predictions = data;
         });
       } else {
         print('Error: ${response.statusCode}');
@@ -41,7 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    getPredictions(); // Fetch predictions on screen load
+    checkPatientsAndLoad();
   }
 
   @override
@@ -54,8 +83,7 @@ class _HomeScreenState extends State<HomeScreen> {
         leading: Padding(
           padding: const EdgeInsets.only(left: 16.0),
           child: CircleAvatar(
-            backgroundImage: NetworkImage(
-                'https://via.placeholder.com/150'), // Replace with actual profile image
+            backgroundImage: NetworkImage('https://via.placeholder.com/150'),
             radius: 25,
           ),
         ),
@@ -74,45 +102,47 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: predictions.isEmpty
-          ? Center(child: CircularProgressIndicator()) // Loading indicator
-          : Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header Section
-                  const Text(
-                    "Medication Predictions",
-                    style: TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : predictions.isEmpty
+              ? const Center(child: Text("No predictions available."))
+              : Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Medication Predictions",
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black),
+                      ),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: predictions.length,
+                          itemBuilder: (context, index) {
+                            final medication = predictions[index];
+                            return Card(
+                              elevation: 3,
+                              margin: const EdgeInsets.only(bottom: 16.0),
+                              child: ListTile(
+                                title: Text(
+                                  medication['Medication_Name'],
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                subtitle: Text("Adherence: ${medication['Adherence']}"),
+                                leading:
+                                    const Icon(Icons.medical_services, color: Colors.green),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 10),
-
-                  // Dynamic List of Predictions
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: predictions.length,
-                      itemBuilder: (context, index) {
-                        final medication = predictions[index];
-                        return Card(
-                          elevation: 3,
-                          margin: const EdgeInsets.only(bottom: 16.0),
-                          child: ListTile(
-                            title: Text(
-                              medication['Medication_Name'],
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            subtitle: Text("Adherence: ${medication['Adherence']}"),
-                            leading: Icon(Icons.medical_services, color: Colors.green),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                ),
       bottomNavigationBar: CustomBottomNavBar(),
     );
   }

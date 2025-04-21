@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../widgets/custom_bottom_navbar.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // ✅ for getting current user
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -11,36 +13,58 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> predictions = [];
   bool isLoading = true;
-  bool hasPatients = false; // 🔸 Simulated patient check
+  String userName = "Loading..."; // 👈 Default until fetched
 
   Future<void> checkPatientsAndLoad() async {
-    // 🔸 Simulated check (replace with Firestore/your DB logic)
     setState(() => isLoading = true);
 
-    await Future.delayed(const Duration(milliseconds: 500)); // Simulate async
-    if (!hasPatients) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          title: const Text('No Patient Found'),
-          content: const Text('You have no registered patients yet. Please fill out the form.'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/patient_form'); // 🔸 Route to form
-              },
-              child: const Text('Proceed to Form'),
-            ),
-          ],
-        ),
-      );
-    } else {
-      await getPredictions();
+    try {
+      await fetchUserName(); // ✅ Get user name before checking patients
+
+      final snapshot = await FirebaseFirestore.instance.collection('patients').get();
+
+      if (snapshot.docs.isEmpty) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text('No Patient Found'),
+            content: const Text('You have no registered patients yet. Please fill out the form.'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.pushNamed(context, '/patient_form');
+                },
+                child: const Text('Proceed to Form'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        await getPredictions();
+      }
+    } catch (e) {
+      print('Error checking patients: $e');
     }
 
     setState(() => isLoading = false);
+  }
+
+  Future<void> fetchUserName() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        if (doc.exists) {
+          setState(() {
+            userName = "${doc['first_name']} ${doc['last_name']}";
+          });
+        }
+      }
+    } catch (e) {
+      print('Error fetching user name: $e');
+    }
   }
 
   Future<void> getPredictions() async {
@@ -80,24 +104,24 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         toolbarHeight: 80,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 16.0),
+        leading: const Padding(
+          padding: EdgeInsets.only(left: 16.0),
           child: CircleAvatar(
             backgroundImage: NetworkImage('https://via.placeholder.com/150'),
             radius: 25,
           ),
         ),
-        title: const Text(
-          "Hello, Jane Doe",
-          style: TextStyle(
+        title: Text(
+          "Hello, $userName",
+          style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
             color: Colors.black,
           ),
         ),
-        actions: [
+        actions: const [
           Padding(
-            padding: const EdgeInsets.only(right: 16.0),
+            padding: EdgeInsets.only(right: 16.0),
             child: Icon(Icons.notifications, color: Colors.black),
           ),
         ],
@@ -114,9 +138,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       const Text(
                         "Medication Predictions",
                         style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black),
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
                       ),
                       const SizedBox(height: 10),
                       Expanded(
@@ -133,8 +158,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   style: const TextStyle(fontWeight: FontWeight.bold),
                                 ),
                                 subtitle: Text("Adherence: ${medication['Adherence']}"),
-                                leading:
-                                    const Icon(Icons.medical_services, color: Colors.green),
+                                leading: const Icon(Icons.medical_services, color: Colors.green),
                               ),
                             );
                           },

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import '../widgets/custom_bottom_navbar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // ✅ for getting current user
+import 'package:firebase_auth/firebase_auth.dart';
+import '../widgets/custom_bottom_navbar.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -13,15 +13,47 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> predictions = [];
   bool isLoading = true;
-  String userName = "Loading..."; // 👈 Default until fetched
+  String userFullName = "Loading...";
+  Map<String, dynamic>? patientData;
+
+  @override
+  void initState() {
+    super.initState();
+    loadUserData();
+    checkPatientsAndLoad();
+  }
+
+  Future<void> loadUserData() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        if (doc.exists) {
+          final data = doc.data()!;
+          setState(() {
+            userFullName = "${data['first_name']} ${data['last_name']}";
+          });
+        }
+      }
+    } catch (e) {
+      print("Error loading user data: $e");
+      setState(() {
+        userFullName = "User";
+      });
+    }
+  }
 
   Future<void> checkPatientsAndLoad() async {
     setState(() => isLoading = true);
 
     try {
-      await fetchUserName(); // ✅ Get user name before checking patients
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
 
-      final snapshot = await FirebaseFirestore.instance.collection('patients').get();
+      final snapshot = await FirebaseFirestore.instance
+          .collection('patients')
+          .where('user_id', isEqualTo: user.uid)
+          .get();
 
       if (snapshot.docs.isEmpty) {
         showDialog(
@@ -42,6 +74,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       } else {
+        setState(() {
+          patientData = snapshot.docs.first.data();
+        });
         await getPredictions();
       }
     } catch (e) {
@@ -49,22 +84,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     setState(() => isLoading = false);
-  }
-
-  Future<void> fetchUserName() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-        if (doc.exists) {
-          setState(() {
-            userName = "${doc['first_name']} ${doc['last_name']}";
-          });
-        }
-      }
-    } catch (e) {
-      print('Error fetching user name: $e');
-    }
   }
 
   Future<void> getPredictions() async {
@@ -92,27 +111,23 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    checkPatientsAndLoad();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFFAF7FB),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         toolbarHeight: 80,
-        leading: const Padding(
-          padding: EdgeInsets.only(left: 16.0),
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 16.0),
           child: CircleAvatar(
-            backgroundImage: NetworkImage('https://via.placeholder.com/150'),
+            backgroundColor: Colors.purple[100],
             radius: 25,
+            child: const Icon(Icons.person, color: Colors.black),
           ),
         ),
         title: Text(
-          "Hello, $userName",
+          "Hello, $userFullName",
           style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
@@ -129,7 +144,58 @@ class _HomeScreenState extends State<HomeScreen> {
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : predictions.isEmpty
-              ? const Center(child: Text("No predictions available."))
+              ? patientData != null
+                  ? Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xF9F5F0), // Light beige/cream
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        margin: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Icon (you can use a different icon or image here)
+                            Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                color: Colors.white,
+                              ),
+                              padding: const EdgeInsets.all(8),
+                              child: const Icon(Icons.medication, size: 32, color: Color(0xFF2F5D50)),
+                            ),
+                            const SizedBox(width: 16),
+
+                            // Text content
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  patientData!['medication'] ?? 'Medication',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF2F5D50),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  "9:30 pm | After eating", // You can make this dynamic later
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Color(0xFF78917C),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    )
+                  : const Center(child: Text("No predictions available."))
               : Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
@@ -138,10 +204,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       const Text(
                         "Medication Predictions",
                         style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                        ),
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black),
                       ),
                       const SizedBox(height: 10),
                       Expanded(
@@ -158,7 +223,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                   style: const TextStyle(fontWeight: FontWeight.bold),
                                 ),
                                 subtitle: Text("Adherence: ${medication['Adherence']}"),
-                                leading: const Icon(Icons.medical_services, color: Colors.green),
+                                leading:
+                                    const Icon(Icons.medical_services, color: Colors.green),
                               ),
                             );
                           },

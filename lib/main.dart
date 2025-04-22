@@ -5,6 +5,7 @@ import 'screens/landing_screen.dart';
 import 'screens/signin_screen.dart';
 import 'screens/signup_screen.dart';
 import 'screens/patient_form_screen.dart';
+import 'screens/profile_screen.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -22,7 +23,6 @@ class MeditrackApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      // Define the routes for navigation
       initialRoute: '/landing',
       routes: {
         '/landing': (context) => LandingScreen(),
@@ -31,6 +31,7 @@ class MeditrackApp extends StatelessWidget {
         '/': (context) => HomeScreen(),
         '/schedule': (context) => ScheduleScreen(),
         '/patient_form': (context) => const PatientFormScreen(),
+        '/profile': (context) => const ProfileScreen(),
       },
     );
   }

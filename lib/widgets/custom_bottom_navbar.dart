@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class CustomBottomNavBar extends StatelessWidget {
   const CustomBottomNavBar({Key? key}) : super(key: key);
 
- void _showAddScheduleDialog(BuildContext context) {
+  void _showAddScheduleDialog(BuildContext context) {
     final TextEditingController nameController = TextEditingController();
-    final TextEditingController timeController = TextEditingController();
+    final TextEditingController frequencyController = TextEditingController();
+    final TextEditingController intervalController = TextEditingController();
     final TextEditingController instructionController = TextEditingController();
 
     showDialog(
@@ -34,7 +37,6 @@ class CustomBottomNavBar extends StatelessWidget {
                 const Divider(),
                 const SizedBox(height: 10),
 
-                // Medication Name
                 TextField(
                   controller: nameController,
                   decoration: InputDecoration(
@@ -49,12 +51,11 @@ class CustomBottomNavBar extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
 
-                // Time
                 TextField(
-                  controller: timeController,
+                  controller: frequencyController,
                   decoration: InputDecoration(
-                    labelText: 'Time (e.g. 9:30 PM)',
-                    prefixIcon: const Icon(Icons.access_time),
+                    labelText: 'Frequency (e.g. 3 times a day)',
+                    prefixIcon: const Icon(Icons.repeat),
                     filled: true,
                     fillColor: const Color(0xFFF5F5F5),
                     border: OutlineInputBorder(
@@ -64,7 +65,20 @@ class CustomBottomNavBar extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
 
-                // Instruction
+                TextField(
+                  controller: intervalController,
+                  decoration: InputDecoration(
+                    labelText: 'Interval (e.g. every 8 hours)',
+                    prefixIcon: const Icon(Icons.schedule),
+                    filled: true,
+                    fillColor: const Color(0xFFF5F5F5),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
                 TextField(
                   controller: instructionController,
                   decoration: InputDecoration(
@@ -91,10 +105,51 @@ class CustomBottomNavBar extends StatelessWidget {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () {
-                // TODO: Save logic
-                print("Saving: ${nameController.text}, ${timeController.text}, ${instructionController.text}");
-                Navigator.pop(context);
+              onPressed: () async {
+                final user = FirebaseAuth.instance.currentUser;
+                if (user == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("User not logged in.")),
+                  );
+                  return;
+                }
+
+                try {
+                  final patientSnapshot = await FirebaseFirestore.instance
+                      .collection('patients')
+                      .where('user_id', isEqualTo: user.uid)
+                      .limit(1)
+                      .get();
+
+                  if (patientSnapshot.docs.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("No patient profile found.")),
+                    );
+                    return;
+                  }
+
+                  final patientId = patientSnapshot.docs.first.id;
+
+                  await FirebaseFirestore.instance.collection('medication_schedules').add({
+                    'patient_id': patientId,
+                    'user_id': user.uid,
+                    'medication_name': nameController.text.trim(),
+                    'frequency': frequencyController.text.trim(),
+                    'interval': intervalController.text.trim(), // ✅ New field
+                    'instruction': instructionController.text.trim(),
+                    'created_at': Timestamp.now(),
+                  });
+
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Schedule saved successfully.")),
+                  );
+                } catch (e) {
+                  print('Error saving schedule: $e');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Error: $e")),
+                  );
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2F5D50),
@@ -125,7 +180,7 @@ class CustomBottomNavBar extends StatelessWidget {
         } else if (index == 2) {
           _showAddScheduleDialog(context);
         }
-        // You can add navigation for index 3 & 4 if needed
+        // Handle navigation for index 3 and 4 as needed
       },
       items: const [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),

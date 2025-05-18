@@ -14,7 +14,7 @@ class CustomBottomNavBar extends StatelessWidget {
     String intervalOption = 'Everyday';
     DateTime? startDate;
     DateTime? untilDate;
-
+ 
     showDialog(
       context: context,
       barrierDismissible: true,
